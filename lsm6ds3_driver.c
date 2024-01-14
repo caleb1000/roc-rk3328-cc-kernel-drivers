@@ -164,10 +164,10 @@ static int my_imu_probe(struct spi_device *client) {
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = my_imu_channels;
 	indio_dev->num_channels = ARRAY_SIZE(my_imu_channels);
-        client->max_speed_hz = 6600;
+        client->max_speed_hz = 10000000;
 	ret = spi_setup(client);
 	if(ret < 0) {
-		pr_err("lsm6ds3_iio - Error! Failed to set up the SPI Bus\n");
+		pr_err("lsm6ds3_iio - Failed to set up the SPI Bus\n");
 		return ret;
 	}
 
@@ -175,7 +175,12 @@ static int my_imu_probe(struct spi_device *client) {
         //Reboot
         buffer[0] = CTRL3_C | LSM6DS3_SPI_WRITE_STROBE_BM;
         buffer[1] = 0b00000101;
-        spi_write(client, buffer, 2);
+        ret = spi_write(client, buffer, 2);
+        if(ret < 0)
+        {
+            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL3_C");
+            return ret;
+        }
 
         //use 6.66 KHz mode (1010)
 	//use +2g mode which is (00) for Scale
@@ -183,6 +188,11 @@ static int my_imu_probe(struct spi_device *client) {
         buffer[0] = CTRL1_XL | LSM6DS3_SPI_WRITE_STROBE_BM;
         buffer[1] = 0b10100000;
         spi_write(imu->client, buffer, 2);
+        if(ret < 0)
+        {
+            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL1_XL");
+            return ret;
+        }
 
         //we need to enable the x,y, and z access
 	//default (00), Zen, Yen, Xen, Soft_EN, default(00)
@@ -190,13 +200,18 @@ static int my_imu_probe(struct spi_device *client) {
         buffer[0] = CTRL9_XL | LSM6DS3_SPI_WRITE_STROBE_BM;
         buffer[1] = 0b00111000;
         spi_write(imu->client, buffer, 2);
+        if(ret < 0)
+        {
+            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL9_XL");
+            return ret;
+        }
 
         //Read the WHO_AM_I register to ensure proper initialization
         ret = spi_w8r8(imu->client, WHO_AM_I | LSM6DS3_SPI_READ_STROBE_BM);
         if(ret != 0x69)
         {
             pr_err("lsm6ds3_iio - Failed to read WHO_AM_I register");
-            return -1;
+            return EIO;
         }
 
 	spi_set_drvdata(client, indio_dev);
