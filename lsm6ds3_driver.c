@@ -26,17 +26,17 @@ static int my_imu_read_acceleration(struct iio_dev * indio_dev, struct iio_chan_
 	if(mask == IIO_CHAN_INFO_RAW) {
             if (chan->channel == 0) {
                 //X-Axis
-                //printk("dt_iio - Read x axis\n");
+                //pr_info("lsm6ds3_iio - Read x axis\n");
                 low_byte = spi_w8r8(imu->client, OUTX_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
                 high_byte = spi_w8r8(imu->client,  OUTX_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
             } else if (chan->channel == 1) {
                 //Y-Axis
-                //printk("dt_iio - Read y axis\n");
+                //pr_info("lsm6ds3_iio - Read y axis\n");
 	        low_byte =spi_w8r8(imu->client, OUTY_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
 	        high_byte = spi_w8r8(imu->client, OUTY_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
             } else if (chan->channel == 2) {
                 //Z-Axis
-                //printk("dt_iio - Read z axis\n");
+                //pr_info("lsm6ds3_iio - Read z axis\n");
 	        low_byte = spi_w8r8(imu->client, OUTZ_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
 	        high_byte = spi_w8r8(imu->client, OUTZ_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
             } else {
@@ -46,6 +46,12 @@ static int my_imu_read_acceleration(struct iio_dev * indio_dev, struct iio_chan_
             raw_value = (int16_t)((high_byte << 8) | low_byte);
 	    *val = (int)raw_value;
 	}
+        else if(mask == IIO_CHAN_INFO_SCALE)
+        {
+            *val = 1;
+            *val2 = 16384;
+            return IIO_VAL_FRACTIONAL;
+        }
 	else{
             return -EINVAL;
         }
@@ -55,28 +61,24 @@ static int my_imu_read_acceleration(struct iio_dev * indio_dev, struct iio_chan_
 static const struct iio_chan_spec my_imu_channels[] = {
     {
         .type = IIO_INCLI,     // Channel type is inclinometer/accelerometer
-        .indexed = 1,
+        .indexed = 1,          // Channel is numerically indexed
         .channel = 0,          // Channel number within the sensor device
-        .channel2 = IIO_MOD_X, // Secondary channel (e.g., for differential measurements)
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW), // Specify available information (e.g., raw data)
         .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE), // Specify shared information (e.g., scale)
-        .extend_name = "accel_x", // Extend the channel name (optional)
+        .extend_name = "accel_x", // Extend the channel name
         .scan_index = 0,       // Index for scan order
         .scan_type = {
             .sign = 's',        // Sign of the raw data ('s' for signed)
             .realbits = 16,     // Number of bits in the raw data
             .storagebits = 16,  // Number of bits to store the data
             .shift = 0,         // Shift value for data alignment
-            .endianness = IIO_BE, // Endianness of the data (big-endian)
+            .endianness = IIO_LE, // Endianness of the data (little-endian)
         },
-        // Additional configuration parameters specific to the accelerometer channel
-        // ...
     },
     {
         .type = IIO_INCLI,
         .indexed = 1,
         .channel = 1,
-        .channel2 = IIO_MOD_Y,
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
         .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE),
         .extend_name = "accel_y",
@@ -86,16 +88,13 @@ static const struct iio_chan_spec my_imu_channels[] = {
             .realbits = 16,
             .storagebits = 16,
             .shift = 0,
-            .endianness = IIO_BE,
+            .endianness = IIO_LE,
         },
-        // Additional configuration parameters specific to the accelerometer channel
-        // ...
     },
     {
         .type = IIO_INCLI,
         .indexed = 1,
         .channel = 2,
-        .channel2 = IIO_MOD_Z,
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
         .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE),
         .extend_name = "accel_z",
@@ -105,10 +104,8 @@ static const struct iio_chan_spec my_imu_channels[] = {
             .realbits = 16,
             .storagebits = 16,
             .shift = 0,
-            .endianness = IIO_BE,
+            .endianness = IIO_LE,
         },
-        // Additional configuration parameters specific to the accelerometer channel
-        // ...
     },
 };
 
@@ -143,8 +140,8 @@ static struct spi_driver my_driver = {
 	},
 };
 
-/**
- * @brief This function is called on loading the driver 
+/*
+ * @brief This function is called on loading the driver
  */
 static int my_imu_probe(struct spi_device *client) {
 	struct iio_dev *indio_dev;
@@ -152,12 +149,11 @@ static int my_imu_probe(struct spi_device *client) {
 	int ret;
         u8 buffer[2];
 
-        pr_info("dt_iio - Probe: Device ID: %s\n", spi_get_device_id(client)->name);
-	printk("dt_iio - Now I am in the Probe function!\n");
+        pr_info("lsm6ds3_iio - Probe: Device ID: %s\n", spi_get_device_id(client)->name);
 
 	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(struct iio_dev));
 	if(!indio_dev) {
-		printk("dt_iio - Error! Out of memory\n");
+		pr_err("lsm6ds3_iio - Error! Out of memory\n");
 		return -ENOMEM;
 	}
 
@@ -171,12 +167,11 @@ static int my_imu_probe(struct spi_device *client) {
         client->max_speed_hz = 6600;
 	ret = spi_setup(client);
 	if(ret < 0) {
-		printk("dt_iio - Error! Failed to set up the SPI Bus\n");
+		pr_err("lsm6ds3_iio - Error! Failed to set up the SPI Bus\n");
 		return ret;
 	}
 
-	//Init IMU
-
+	/*--------------Initialize lsm6ds3-------------------------------*/
         //Reboot
         buffer[0] = CTRL3_C | LSM6DS3_SPI_WRITE_STROBE_BM;
         buffer[1] = 0b00000101;
@@ -196,11 +191,11 @@ static int my_imu_probe(struct spi_device *client) {
         buffer[1] = 0b00111000;
         spi_write(imu->client, buffer, 2);
 
+        //Read the WHO_AM_I register to ensure proper initialization
         ret = spi_w8r8(imu->client, WHO_AM_I | LSM6DS3_SPI_READ_STROBE_BM);
-
         if(ret != 0x69)
         {
-            printk("dt_iio - Failed to read WHO_AM_I register");
+            pr_err("lsm6ds3_iio - Failed to read WHO_AM_I register");
             return -1;
         }
 
@@ -209,11 +204,11 @@ static int my_imu_probe(struct spi_device *client) {
 	return devm_iio_device_register(&client->dev, indio_dev);
 }
 
-/**
- * @brief This function is called on unloading the driver 
+/*
+ * @brief This function is called on unloading the driver
  */
 static void my_imu_remove(struct spi_device *client) {
-	printk("dt_iio - Now I am in the Remove function!\n");
+	pr_info("lsm6ds3_iio - Removing device!\n");
 }
 
 /* This will create the init and exit function automatically */
