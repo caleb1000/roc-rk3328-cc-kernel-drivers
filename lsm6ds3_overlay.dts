@@ -1,0 +1,28 @@
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "rockchip,rk3328";
+        fragment@0 {
+		target-path = "/aliases";
+		__overlay__ {
+			spi0 = "/soc/spi@ff190000";
+		};
+	};
+
+	fragment@1 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			my_imu: my_imu@0 {
+				compatible = "lsm6ds3,myimu";
+				reg = <0x0>;
+				spi-max-frequency = <6660>;
+				spi-bits-per-word = <8>;
+				status = "okay";
+			};
+		};
+	};
+};
