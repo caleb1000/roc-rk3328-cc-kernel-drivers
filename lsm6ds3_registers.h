@@ -15,12 +15,6 @@
   Last modified on: 1/14/2024
 ------------------------------------------------------------------------------*/
 
-/***********************************MACROS*************************************/
-/********************************END OF MACROS*********************************/
-
-
-/*******************************CUSTOM DATA TYPES******************************/
-
 typedef enum LSM6DS3_ACCEL_REGISTERS
 {
     FUNC_CFG_ACCESS             = 0x01,
@@ -38,12 +32,38 @@ typedef enum LSM6DS3_ACCEL_REGISTERS
     INT2_CTRL                   = 0x0E,
 
     WHO_AM_I                    = 0x0F,
+    WHO_AM_I_EXPECTED_VALUE     = 0x69,
 
     CTRL1_XL                    = 0x10,
+    CTRL1_XL_POWER_DOWN_BM      = 0x00,
+    CTRL1_XL_12HZ_BM            = 0x10,
+    CTRL1_XL_26HZ_BM            = 0x20,
+    CTRL1_XL_52HZ_BM            = 0x30,
+    CTRL1_XL_104HZ_BM           = 0x40,
+    CTRL1_XL_208HZ_BM           = 0x50,
+    CTRL1_XL_416HZ_BM           = 0x60,
+    CTRL1_XL_833HZ_BM           = 0x70,
+    CTRL1_XL_1660HZ_BM          = 0x80,
+    CTRL1_XL_3330HZ_BM          = 0x90,
+    CTRL1_XL_6660HZ_BM          = 0xA0,
+    CTRL1_XL_SCALE_2G_BM        = 0x00,
+    CTRL1_XL_SCALE_16G_BM       = 0x04,
+    CTRL1_XL_SCALE_4G_BM        = 0x08,
+    CTRL1_XL_SCALE_8G_BM        = 0x0C,
+    CTRL1_XL_FILTER_400HZ_BM    = 0x00,
+    CTRL1_XL_FILTER_200HZ_BM    = 0x01,
+    CTRL1_XL_FILTER_100HZ_BM    = 0x02,
+    CTRL1_XL_FILTER_50HZ_BM     = 0x03,
 
     CTRL2_G                     = 0x11,
 
     CTRL3_C                     = 0x12,
+    CTRL3_C_SW_RESET_BM         = 0x01,
+    CTRL3_C_BLE_LE_BM           = 0x00,
+    CTRL3_C_BLE_BE_BM           = 0x02,
+    CTRL3_C_SIM_4_WIRE_BM       = 0x00,
+    CTRL3_C_SIM_3_WIRE_BM       = 0x04,
+
     CTRL4_C                     = 0x13,
     CTRL5_C                     = 0x14,
     CTRL6_C                     = 0x15,
@@ -51,7 +71,14 @@ typedef enum LSM6DS3_ACCEL_REGISTERS
     CTRL7_G                     = 0x16,
 
     CTRL8_XL                    = 0x17,
+
     CTRL9_XL                    = 0x18,
+    CTRL9_XL_Z_EN_BM            = 0x20,
+    CTRL9_XL_Y_EN_BM            = 0x10,
+    CTRL9_XL_X_EN_BM            = 0x08,
+    CTRL9_XL_SOFT_EN_BM         = 0x01,
+    CTRL9_XL_SOFT_DIS_BM        = 0x00,
+
     CTRL10_C                    = 0x19,
 
     MASTER_CONFIG               = 0x1A,
@@ -137,10 +164,11 @@ typedef enum LSM6DS3_ACCEL_REGISTERS
     OUT_MAG_RAW_Y_L             = 0x68,
     OUT_MAG_RAW_Y_H             = 0x69,
     OUT_MAG_RAW_Z_L             = 0x6A,
-    OUT_MAG_RAW_Z_H             = 0x6B
+    OUT_MAG_RAW_Z_H             = 0x6B,
+
+    LSM6DS3_SPI_WRITE_STROBE_BM = 0x00,
+    LSM6DS3_SPI_READ_STROBE_BM  = 0x80
 
 } LSM6DS3_REGA_t;
-
-/***************************END OF CUSTOM DATA TYPES***************************/
 
 #endif  // End of header guard.

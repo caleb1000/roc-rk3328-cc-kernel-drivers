@@ -5,9 +5,6 @@
 #include <linux/iio/sysfs.h>
 #include "lsm6ds3_registers.h"
 
-#define LSM6DS3_SPI_WRITE_STROBE_BM 0x00
-#define LSM6DS3_SPI_READ_STROBE_BM 0x80
-
 /* Meta Information */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Caleb Steinmetz");
@@ -172,9 +169,11 @@ static int my_imu_probe(struct spi_device *client) {
 	}
 
 	/*--------------Initialize lsm6ds3-------------------------------*/
-        //Reboot
+        //Software reset
+        //Set in SPI 4-Wire mode
+        //Set in little-endian
         buffer[0] = CTRL3_C | LSM6DS3_SPI_WRITE_STROBE_BM;
-        buffer[1] = 0b00000101;
+        buffer[1] = CTRL3_C_SW_RESET_BM | CTRL3_C_BLE_LE_BM | CTRL3_C_SIM_4_WIRE_BM;
         ret = spi_write(client, buffer, 2);
         if(ret < 0)
         {
@@ -182,11 +181,11 @@ static int my_imu_probe(struct spi_device *client) {
             return ret;
         }
 
-        //use 6.66 KHz mode (1010)
+        //use 208 Hz mode (0101)
 	//use +2g mode which is (00) for Scale
 	//use 400 Hz filter (00) for filter
         buffer[0] = CTRL1_XL | LSM6DS3_SPI_WRITE_STROBE_BM;
-        buffer[1] = 0b10100000;
+        buffer[1] = CTRL1_XL_208HZ_BM | CTRL1_XL_SCALE_2G_BM | CTRL1_XL_FILTER_400HZ_BM;
         spi_write(imu->client, buffer, 2);
         if(ret < 0)
         {
@@ -198,7 +197,7 @@ static int my_imu_probe(struct spi_device *client) {
 	//default (00), Zen, Yen, Xen, Soft_EN, default(00)
 	//X, Y, and Z enabled and soft-iron correction turned off
         buffer[0] = CTRL9_XL | LSM6DS3_SPI_WRITE_STROBE_BM;
-        buffer[1] = 0b00111000;
+        buffer[1] = CTRL9_XL_X_EN_BM |CTRL9_XL_Y_EN_BM | CTRL9_XL_Z_EN_BM | CTRL9_XL_SOFT_DIS_BM;
         spi_write(imu->client, buffer, 2);
         if(ret < 0)
         {
@@ -208,7 +207,7 @@ static int my_imu_probe(struct spi_device *client) {
 
         //Read the WHO_AM_I register to ensure proper initialization
         ret = spi_w8r8(imu->client, WHO_AM_I | LSM6DS3_SPI_READ_STROBE_BM);
-        if(ret != 0x69)
+        if(ret != WHO_AM_I_EXPECTED_VALUE)
         {
             pr_err("lsm6ds3_iio - Failed to read WHO_AM_I register");
             return EIO;
