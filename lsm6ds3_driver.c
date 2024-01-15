@@ -14,45 +14,100 @@ struct my_imu {
 	struct spi_device *client;
 };
 
-static int my_imu_read_acceleration(struct iio_dev * indio_dev, struct iio_chan_spec const * chan, int *val, int *val2, long mask) {
+static int my_imu_read_raw(struct iio_dev * indio_dev, struct iio_chan_spec const * chan, int *val, int *val2, long mask) {
 	struct my_imu *imu = iio_priv(indio_dev);
         uint8_t low_byte, high_byte;
         int16_t raw_value;
 
-        //query channel number to see which axis value is being requested
-	if(mask == IIO_CHAN_INFO_RAW) {
-            if (chan->channel == 0) {
-                //X-Axis
-                //pr_info("lsm6ds3_iio - Read x axis\n");
-                low_byte = spi_w8r8(imu->client, OUTX_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
-                high_byte = spi_w8r8(imu->client,  OUTX_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
-            } else if (chan->channel == 1) {
-                //Y-Axis
-                //pr_info("lsm6ds3_iio - Read y axis\n");
-	        low_byte =spi_w8r8(imu->client, OUTY_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
-	        high_byte = spi_w8r8(imu->client, OUTY_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
-            } else if (chan->channel == 2) {
-                //Z-Axis
-                //pr_info("lsm6ds3_iio - Read z axis\n");
-	        low_byte = spi_w8r8(imu->client, OUTZ_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
-	        high_byte = spi_w8r8(imu->client, OUTZ_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
-            } else {
-                return -EINVAL;
+        //Check mask to see if request is for raw data
+	if(mask == IIO_CHAN_INFO_RAW)
+        {
+            //Check type to see if request is for accelerometer data
+            if(chan->type == IIO_INCLI)
+            {
+                if (chan->channel == 0)
+                {
+                    //X-Axis
+                    low_byte = spi_w8r8(imu->client, OUTX_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
+                    high_byte = spi_w8r8(imu->client,  OUTX_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else if (chan->channel == 1)
+                {
+                    //Y-Axis
+	            low_byte =spi_w8r8(imu->client, OUTY_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
+	            high_byte = spi_w8r8(imu->client, OUTY_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else if (chan->channel == 2)
+                {
+                    //Z-Axis
+	            low_byte = spi_w8r8(imu->client, OUTZ_L_XL | LSM6DS3_SPI_READ_STROBE_BM);
+	            high_byte = spi_w8r8(imu->client, OUTZ_H_XL | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else
+                {
+                    pr_err("lsm6ds3_iio: Error, invalid channel value for IIO_INCLI");
+                    return -EINVAL;
+                }
             }
-
+            //Check type to see if request is for gyroscope data
+            else if (chan->type == IIO_ANGL_VEL)
+            {
+                if (chan->channel == 3)
+                {
+                    //X-Axis
+                    low_byte = spi_w8r8(imu->client, OUTX_L_G | LSM6DS3_SPI_READ_STROBE_BM);
+                    high_byte = spi_w8r8(imu->client,  OUTX_H_G | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else if (chan->channel == 4)
+                {
+                    //Y-Axis
+	            low_byte =spi_w8r8(imu->client, OUTY_L_G | LSM6DS3_SPI_READ_STROBE_BM);
+	            high_byte = spi_w8r8(imu->client, OUTY_H_G | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else if (chan->channel == 5)
+                {
+                    //Z-Axis
+	            low_byte = spi_w8r8(imu->client, OUTZ_L_G | LSM6DS3_SPI_READ_STROBE_BM);
+	            high_byte = spi_w8r8(imu->client, OUTZ_H_G | LSM6DS3_SPI_READ_STROBE_BM);
+                }
+                else
+                {
+                    pr_err("lsm6ds3_iio: Error, invalid channel value for IIO_ANGL_VEL");
+                    return -EINVAL;
+                }
+            }
             raw_value = (int16_t)((high_byte << 8) | low_byte);
 	    *val = (int)raw_value;
+            return IIO_VAL_INT;
 	}
+        //Check mask to see if request is for scale
         else if(mask == IIO_CHAN_INFO_SCALE)
         {
-            *val = 1;
-            *val2 = 16384;
-            return IIO_VAL_FRACTIONAL;
+             if(chan->type == IIO_ANGL_VEL)
+             {
+                 //Assume 250 DPS
+                 *val = 250;
+                 //Max absolute value of 16-bit 2's comp
+                 *val2 = 32768;
+                 return IIO_VAL_FRACTIONAL;
+             }
+
+             if(chan->type == IIO_INCLI)
+             {
+                 //Assume +-2G scale
+                 *val = 1;
+                 *val2 = 16384;
+                 return IIO_VAL_FRACTIONAL;
+             }
+             else
+             {
+                 pr_err("lsm6ds3_iio: Error, invalid channel type for scale");
+                 return -EINVAL;
+             }
         }
-	else{
-            return -EINVAL;
-        }
-	return IIO_VAL_INT;
+        //Invalid mask, return error
+        pr_err("lsm6ds3_iio: Error, invalid mask");
+        return -EINVAL;
 }
 
 static const struct iio_chan_spec my_imu_channels[] = {
@@ -61,7 +116,7 @@ static const struct iio_chan_spec my_imu_channels[] = {
         .indexed = 1,          // Channel is numerically indexed
         .channel = 0,          // Channel number within the sensor device
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW), // Specify available information (e.g., raw data)
-        .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE), // Specify shared information (e.g., scale)
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE), // Specify shared information (e.g., scale)
         .extend_name = "accel_x", // Extend the channel name
         .scan_index = 0,       // Index for scan order
         .scan_type = {
@@ -77,7 +132,7 @@ static const struct iio_chan_spec my_imu_channels[] = {
         .indexed = 1,
         .channel = 1,
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-        .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE),
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
         .extend_name = "accel_y",
         .scan_index = 1,
         .scan_type = {
@@ -93,9 +148,57 @@ static const struct iio_chan_spec my_imu_channels[] = {
         .indexed = 1,
         .channel = 2,
         .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-        .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SCALE),
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
         .extend_name = "accel_z",
         .scan_index = 2,
+        .scan_type = {
+            .sign = 's',
+            .realbits = 16,
+            .storagebits = 16,
+            .shift = 0,
+            .endianness = IIO_LE,
+        },
+    },
+    {
+        .type = IIO_ANGL_VEL,     // Channel type is for Gyroscopes
+        .indexed = 1,          // Channel is numerically indexed
+        .channel = 3,          // Channel number within the sensor device
+        .info_mask_separate = BIT(IIO_CHAN_INFO_RAW), // Specify available information (e.g., raw data)
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE), // Specify shared information (e.g., scale)
+        .extend_name = "gyro_x", // Extend the channel name
+        .scan_index = 3,       // Index for scan order
+        .scan_type = {
+            .sign = 's',        // Sign of the raw data ('s' for signed)
+            .realbits = 16,     // Number of bits in the raw data
+            .storagebits = 16,  // Number of bits to store the data
+            .shift = 0,         // Shift value for data alignment
+            .endianness = IIO_LE, // Endianness of the data (little-endian)
+        },
+    },
+    {
+        .type = IIO_ANGL_VEL,
+        .indexed = 1,
+        .channel = 4,
+        .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
+        .extend_name = "gyro_y",
+        .scan_index = 4,
+        .scan_type = {
+            .sign = 's',
+            .realbits = 16,
+            .storagebits = 16,
+            .shift = 0,
+            .endianness = IIO_LE,
+        },
+    },
+    {
+        .type = IIO_ANGL_VEL,
+        .indexed = 1,
+        .channel = 5,
+        .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+        .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
+        .extend_name = "gyro_z",
+        .scan_index = 5,
         .scan_type = {
             .sign = 's',
             .realbits = 16,
@@ -107,7 +210,7 @@ static const struct iio_chan_spec my_imu_channels[] = {
 };
 
 static const struct iio_info my_imu_info = {
-	.read_raw = my_imu_read_acceleration,
+	.read_raw = my_imu_read_raw,
 };
 
 /* Declate the probe and remove functions */
@@ -146,11 +249,11 @@ static int my_imu_probe(struct spi_device *client) {
 	int ret;
         u8 buffer[2];
 
-        pr_info("lsm6ds3_iio - Probe: Device ID: %s\n", spi_get_device_id(client)->name);
+        pr_info("lsm6ds3_iio: Probe - Device ID: %s\n", spi_get_device_id(client)->name);
 
 	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(struct iio_dev));
 	if(!indio_dev) {
-		pr_err("lsm6ds3_iio - Error! Out of memory\n");
+		pr_err("lsm6ds3_iio: Error! Out of memory\n");
 		return -ENOMEM;
 	}
 
@@ -164,7 +267,7 @@ static int my_imu_probe(struct spi_device *client) {
         client->max_speed_hz = 10000000;
 	ret = spi_setup(client);
 	if(ret < 0) {
-		pr_err("lsm6ds3_iio - Failed to set up the SPI Bus\n");
+		pr_err("lsm6ds3_iio: Failed to set up the SPI Bus\n");
 		return ret;
 	}
 
@@ -177,7 +280,7 @@ static int my_imu_probe(struct spi_device *client) {
         ret = spi_write(client, buffer, 2);
         if(ret < 0)
         {
-            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL3_C");
+            pr_err("lsm6ds3_iio: Failed to wrtie to CTRL3_C");
             return ret;
         }
 
@@ -189,7 +292,7 @@ static int my_imu_probe(struct spi_device *client) {
         spi_write(imu->client, buffer, 2);
         if(ret < 0)
         {
-            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL1_XL");
+            pr_err("lsm6ds3_iio: Failed to wrtie to CTRL1_XL");
             return ret;
         }
 
@@ -201,7 +304,17 @@ static int my_imu_probe(struct spi_device *client) {
         spi_write(imu->client, buffer, 2);
         if(ret < 0)
         {
-            pr_err("lsm6ds3_iio - Failed to wrtie to CTRL9_XL");
+            pr_err("lsm6ds3_iio: Failed to wrtie to CTRL9_XL");
+            return ret;
+        }
+
+	//Enable gyroscope at 208HZ and 250DPS
+        buffer[0] = CTRL2_G | LSM6DS3_SPI_WRITE_STROBE_BM;
+        buffer[1] = CTRL2_G_RATE_208HZ_BM | CTRL2_G_250_DPS_BM | CTRL2_G_125_DPS_DIS_BM;
+        spi_write(imu->client, buffer, 2);
+        if(ret < 0)
+        {
+            pr_err("lsm6ds3_iio: Failed to wrtie to CTRL2_G");
             return ret;
         }
 
@@ -209,7 +322,7 @@ static int my_imu_probe(struct spi_device *client) {
         ret = spi_w8r8(imu->client, WHO_AM_I | LSM6DS3_SPI_READ_STROBE_BM);
         if(ret != WHO_AM_I_EXPECTED_VALUE)
         {
-            pr_err("lsm6ds3_iio - Failed to read WHO_AM_I register");
+            pr_err("lsm6ds3_iio: Failed to read WHO_AM_I register");
             return EIO;
         }
 
@@ -222,7 +335,7 @@ static int my_imu_probe(struct spi_device *client) {
  * @brief This function is called on unloading the driver
  */
 static void my_imu_remove(struct spi_device *client) {
-	pr_info("lsm6ds3_iio - Removing device!\n");
+	pr_info("lsm6ds3_iio: Removing device!\n");
 }
 
 /* This will create the init and exit function automatically */

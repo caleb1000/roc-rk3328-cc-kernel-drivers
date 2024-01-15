@@ -56,6 +56,10 @@ typedef enum LSM6DS3_ACCEL_REGISTERS
     CTRL1_XL_FILTER_50HZ_BM     = 0x03,
 
     CTRL2_G                     = 0x11,
+    CTRL2_G_RATE_208HZ_BM       = 0x50,
+    CTRL2_G_250_DPS_BM          = 0x00,
+    CTRL2_G_125_DPS_EN_BM       = 0x01,
+    CTRL2_G_125_DPS_DIS_BM      = 0x00,
 
     CTRL3_C                     = 0x12,
     CTRL3_C_SW_RESET_BM         = 0x01,
