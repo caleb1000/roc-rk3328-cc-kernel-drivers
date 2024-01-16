@@ -1,0 +1,1 @@
+cmd_/home/ubuntu/device_drivers/sm_s2309s_driver/sm_s2309s_driver.ko := ld -r  -EL  -maarch64elf -z noexecstack   --build-id=sha1  -T scripts/module.lds -o /home/ubuntu/device_drivers/sm_s2309s_driver/sm_s2309s_driver.ko /home/ubuntu/device_drivers/sm_s2309s_driver/sm_s2309s_driver.o /home/ubuntu/device_drivers/sm_s2309s_driver/sm_s2309s_driver.mod.o;  true

@@ -1,0 +1,1 @@
+cmd_/home/ubuntu/device_drivers/sm_s2309s_driver/modules.order := {   echo /home/ubuntu/device_drivers/sm_s2309s_driver/sm_s2309s_driver.ko; :; } | awk '!x[$$0]++' - > /home/ubuntu/device_drivers/sm_s2309s_driver/modules.order
