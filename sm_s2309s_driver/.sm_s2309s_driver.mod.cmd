@@ -1,0 +1,1 @@
+cmd_/home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/sm_s2309s_driver.mod := printf '%s\n'   sm_s2309s_driver.o | awk '!x[$$0]++ { print("/home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/"$$0) }' > /home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/sm_s2309s_driver.mod
