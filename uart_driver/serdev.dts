@@ -1,0 +1,16 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "rockchip,rk3328";
+
+        fragment@0 {
+                target = <&uart1>;
+                __overlay__ {
+                   echodev {
+				compatible = "brightlight,echodev";
+				status = "okay";
+			};
+                };
+        };
+};
