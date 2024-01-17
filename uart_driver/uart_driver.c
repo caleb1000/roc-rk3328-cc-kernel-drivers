@@ -9,59 +9,70 @@
 /* Meta Information */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Caleb Steinmetz");
-MODULE_DESCRIPTION("A simple loopback driver for an UART port");
+MODULE_DESCRIPTION("A simple loopback driver for an UART port. This will be used to create a UART driver for the YDLIDAR X4");
 
 /* Declate the probe and remove functions */
-static int serdev_echo_probe(struct serdev_device *serdev);
-static void serdev_echo_remove(struct serdev_device *serdev);
+static int uart_driver_probe(struct serdev_device *serdev);
+static void uart_driver_remove(struct serdev_device *serdev);
 
-static struct of_device_id serdev_echo_ids[] = {
+const unsigned char start_scan_mode_command[2]      = {0xA5,0x60};
+const unsigned char stop_scan_mode_command[2]       = {0xA5,0x65};
+const unsigned char device_info_command[2]          = {0xA5,0x90};
+const unsigned char health_status_command[2]        = {0xA5,0x91};
+const unsigned char reboot_command[2]               = {0xA5,0x80};
+
+//Device driver will eventually be writen for the YDLIDAR X4
+static struct of_device_id uart_driver_ids[] = {
 	{
 		.compatible = "brightlight,echodev",
 	}, { /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, serdev_echo_ids);
+MODULE_DEVICE_TABLE(of, uart_driver_ids);
 
-static struct serdev_device_driver serdev_echo_driver = {
-	.probe = serdev_echo_probe,
-	.remove = serdev_echo_remove,
+static struct serdev_device_driver uart_driver_driver = {
+	.probe = uart_driver_probe,
+	.remove = uart_driver_remove,
 	.driver = {
 		.name = "serdev-echo",
-		.of_match_table = serdev_echo_ids,
+		.of_match_table = uart_driver_ids,
 	},
 };
 
 /**
  * @brief Callback is called whenever a character is received
  */
-static int serdev_echo_recv(struct serdev_device *serdev, const unsigned char *buffer, size_t size) {
-	printk("serdev_echo - Received %ld bytes with \"%s\"\n", size, buffer);
-        return serdev_device_write_buf(serdev, buffer, size);
+static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *buffer, size_t size) {
+         pr_info("Raw bytes read");
+         for(int x = 0; x < size; x++)
+         {
+            pr_info("%x\n",buffer[x]);
+         }
+         return 0;
 }
 
-static const struct serdev_device_ops serdev_echo_ops = {
-	.receive_buf = serdev_echo_recv,
+static const struct serdev_device_ops uart_driver_ops = {
+	.receive_buf = uart_driver_recv,
 };
 
 /**
- * @brief This function is called on loading the driver 
+ * @brief This function is called on loading the driver
  */
-static int serdev_echo_probe(struct serdev_device *serdev) {
+static int uart_driver_probe(struct serdev_device *serdev) {
 	int status;
-	printk("serdev_echo - probe function!\n");
+	pr_info("uart_driver - probe function!\n");
 
-	serdev_device_set_client_ops(serdev, &serdev_echo_ops);
+	serdev_device_set_client_ops(serdev, &uart_driver_ops);
 	status = serdev_device_open(serdev);
 	if(status) {
-		printk("serdev_echo - Error opening serial port!\n");
+		pr_err("uart_driver - Error opening serial port!\n");
 		return -status;
 	}
 	serdev_device_set_baudrate(serdev, 128000);
 	serdev_device_set_flow_control(serdev, false);
 	serdev_device_set_parity(serdev, SERDEV_PARITY_NONE);
 
-	status = serdev_device_write_buf(serdev, "Caleb", sizeof("Caleb"));
-	printk("serdev_echo - Probe Wrote %d bytes.\n", status);
+	status = serdev_device_write_buf(serdev, start_scan_mode_command, 2);
+	pr_info("uart_driver - Start scan mode command: %d bytes sent.\n", status);
 
 	return 0;
 }
@@ -69,8 +80,8 @@ static int serdev_echo_probe(struct serdev_device *serdev) {
 /**
  * @brief This function is called on unloading the driver 
  */
-static void serdev_echo_remove(struct serdev_device *serdev) {
-	printk("serdev_echo - Now I am in the remove function\n");
+static void uart_driver_remove(struct serdev_device *serdev) {
+	pr_info("uart_driver - Now I am in the remove function\n");
 	serdev_device_close(serdev);
 }
 
@@ -78,9 +89,9 @@ static void serdev_echo_remove(struct serdev_device *serdev) {
  * @brief This function is called, when the module is loaded into the kernel
  */
 static int __init my_init(void) {
-	printk("serdev_echo - Loading the driver...\n");
-	if(serdev_device_driver_register(&serdev_echo_driver)) {
-		printk("serdev_echo - Error! Could not load driver\n");
+	pr_info("uart_driver - Loading the driver...\n");
+	if(serdev_device_driver_register(&uart_driver_driver)) {
+		printk("uart_driver - Error! Could not load driver\n");
 		return -1;
 	}
 	return 0;
@@ -90,8 +101,8 @@ static int __init my_init(void) {
  * @brief This function is called, when the module is removed from the kernel
  */
 static void __exit my_exit(void) {
-	printk("serdev_echo - Unload driver");
-	serdev_device_driver_unregister(&serdev_echo_driver);
+	pr_info("uart_driver - Unload driver");
+	serdev_device_driver_unregister(&uart_driver_driver);
 }
 
 module_init(my_init);
