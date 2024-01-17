@@ -1,1 +1,0 @@
-cmd_/home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/modules.order := {   echo /home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/sm_s2309s_driver.ko; :; } | awk '!x[$$0]++' - > /home/ubuntu/roc-rk3328-cc-kernel-drivers/sm_s2309s_driver/modules.order
