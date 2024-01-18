@@ -7,6 +7,12 @@
         fragment@0 {
                 target = <&uart1>;
                 __overlay__ {
+				status = "okay";
+                };
+        };
+        fragment@1 {
+                target = <&uart1>;
+                __overlay__ {
                    echodev {
 				compatible = "brightlight,echodev";
 				status = "okay";
