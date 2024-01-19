@@ -42,6 +42,7 @@ int  buffer_size = 0;
 //Buffer that contains values
 char *my_buffer;
 
+bool scan_mode = false;
 
 #define DRIVER_NAME "my_uart_driver"
 #define DRIVER_CLASS "UartClass"
@@ -61,14 +62,19 @@ char *my_buffer;
 #define REBOOT_IOC_MAGIC 'V'
 #define SEND_REBOOT_COMMAND _IOW(REBOOT_IOC_MAGIC, 1, unsigned long)
 
+#define MODE_IOC_MAGIC 'U'
+#define CURRENT_MODE _IOW(MODE_IOC_MAGIC, 1, unsigned long)
+
 long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
 	if (cmd == SEND_START_COMMAND) {
+            scan_mode = true;
             serdev_device_write_buf(uartdev, start_scan_mode_command, 2);
             pr_info("ydlidar_x4_driver - Start scan mode command");
             return 1;
 	}
 	else if (cmd == SEND_STOP_COMMAND) {
+            scan_mode = false;
             serdev_device_write_buf(uartdev, stop_scan_mode_command, 2);
             pr_info("ydlidar_x4_driver - Stop scan mode command");
             return 1;
@@ -86,21 +92,37 @@ long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 	else if (cmd == SEND_REBOOT_COMMAND) {
             serdev_device_write_buf(uartdev, reboot_command, 2);
             pr_info("ydlidar_x4_driver - Reboot command");
+            scan_mode = false;
             return 1;
 	}
-        pr_err("uart_driver: No supported command issued");
+	else if (cmd == CURRENT_MODE) {
+            if(scan_mode){
+                pr_info("ydlidar_x4_driver - Scan mode");
+                return 1;
+            }
+            else{
+                pr_info("ydlidar_x4_driver - Stop mode");
+                return 0;
+            }
+	}
+        pr_err("ydlidar_x4_driver - No supported command issued");
 	return -1;
 }
 
 static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
         //return my_buffer to users space
         int attempts = 10;
+        if(!scan_mode)
+        {
+	        pr_err("ydlidar_x4 - Error, not in scan mode!");
+                return -EINVAL;
+        }
         while (1) {
             // Attempt to acquire the semaphore
             if(attempts == 0)
             {
                 up(&my_semaphore);
-	        pr_err("Error, invalid read!");
+	        pr_err("ydlidar_x4 - Error, invalid read!");
                 return -EINVAL;
             }
             if (down_interruptible(&my_semaphore)) {
@@ -120,7 +142,7 @@ static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, lo
         if(copy_to_user(buf, my_buffer, 500))
         {
             up(&my_semaphore);
-	    pr_err("Error, invalid read!");
+	    pr_err("ydlidar_x4 - Error, invalid read!");
             return -EINVAL;
         }
         //Buffer data has been read, set flag so that this old data is not read again
@@ -157,7 +179,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
          }
          //printk("\nHeader values %x%x",buffer[0],buffer[1]);
          //Semaphore acquired
-         //printk("Size %ld\n", size);
+         //printk("Uart Buffer Size %ld\n", size);
          //for(int x = 0; x < size; x++)
          //{
          //    pr_info("%x\n",buffer[x]);
@@ -232,13 +254,16 @@ static int uart_driver_probe(struct serdev_device *serdev) {
 	serdev_device_set_baudrate(serdev, 128000);
 	serdev_device_set_flow_control(serdev, false);
 	serdev_device_set_parity(serdev, SERDEV_PARITY_NONE);
+        //Ensure device is in stop mode
+        serdev_device_write_buf(serdev, stop_scan_mode_command, 2);
+        //Set pointer to allow access to serdev from within ioctl
         uartdev = serdev;
 
 	return 0;
 }
 
 /**
- * @brief This function is called on unloading the driver 
+ * @brief This function is called on unloading the driver
  */
 static void uart_driver_remove(struct serdev_device *serdev) {
 	pr_info("ydlidar_x4_driver - Now I am in the remove function\n");

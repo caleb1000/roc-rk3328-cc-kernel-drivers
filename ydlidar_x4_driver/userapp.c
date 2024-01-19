@@ -28,9 +28,12 @@
 #define REBOOT_IOC_MAGIC 'V'
 #define SEND_REBOOT_COMMAND _IOW(REBOOT_IOC_MAGIC, 1, unsigned long)
 
+#define MODE_IOC_MAGIC 'U'
+#define CURRENT_MODE _IOW(MODE_IOC_MAGIC, 1, unsigned long)
+
 
 int main(int argc, char *argv[]) {
-	int fd;
+	int fd, packet_count;
         char command, read_buf[500];
 	fd = open(DEVICE, O_RDWR);
 	if(fd == -1) {
@@ -39,6 +42,14 @@ int main(int argc, char *argv[]) {
 		exit(-1);
 	}
         while (1) {
+        if(ioctl(fd, CURRENT_MODE, 0) == 1)
+        {
+            printf("Currently in scan mode\n");
+        }
+        else
+        {
+            printf("Currently in stop mode\n");
+        }
         // Prompt user for input
         printf("Select a command:\n"
                "0 - Exit\n"
@@ -69,12 +80,22 @@ int main(int argc, char *argv[]) {
                 ioctl(fd, SEND_REBOOT_COMMAND, 0);
                 break;
             case '6':
-   while(1){
-                read(fd, read_buf, sizeof(read_buf));
-                //for(int x = 0; x < sizeof(read_buf); x++)
-                //{
-                //   printf("%x",read_buf[x]);
-                //}
+                // Prompt the user for input
+                printf("Enter the number of packets you wish to parse: ");
+
+                // Read the user input
+                if (scanf("%d", &packet_count) != 1 || packet_count <= 0) {
+                //Invalid input or non-positive integer
+                printf("Invalid input. Please enter a positive integer.\n");
+                    break;
+                }
+
+   for(int i = 0; i < packet_count; i++){
+                if(read(fd, read_buf, sizeof(read_buf)) != 0)
+                {
+                    printf("Read failed (HINT: scan mode must be set first)!\n");
+                    continue;
+                }
                 if(read_buf[0] == 0xAA && read_buf[1] == 0x55){
                     printf("Valid header found\n");
                     printf("Packet type: %x\n",read_buf[2]);
@@ -142,7 +163,7 @@ int main(int argc, char *argv[]) {
                 close(fd);
                 return 0;
             default:
-                printf("Invalid command. Please enter a valid command (0-5).\n");
+                printf("Invalid command. Please enter a valid command (0-6).\n");
         }
     }
     close(fd);
