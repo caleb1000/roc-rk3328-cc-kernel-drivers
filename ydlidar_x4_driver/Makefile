@@ -1,4 +1,4 @@
-obj-m += uart_driver.o
+obj-m += ydlidar_x4_driver.o
 
 all: module app
 	echo Builded Device Tree Overlay and kernel module

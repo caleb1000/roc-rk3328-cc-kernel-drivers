@@ -116,6 +116,8 @@ static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, lo
 	    pr_err("Error, invalid read!");
             return -EINVAL;
         }
+        //Buffer data has been read, set flag so that this old data is not read again
+        buffer_ready = false;
         up(&my_semaphore);
 	return 0;
 }
@@ -146,13 +148,13 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              //Failed to aquire semaphore, no values read from buffer
              return 0;
          }
-         printk("\nHeader values %x%x",buffer[0],buffer[1]);
+         //printk("\nHeader values %x%x",buffer[0],buffer[1]);
          //Semaphore acquired
-         printk("Size %ld\n", size);
-         for(int x = 0; x < size; x++)
-         {
-             pr_info("%x\n",buffer[x]);
-         }
+         //printk("Size %ld\n", size);
+         //for(int x = 0; x < size; x++)
+         //{
+         //    pr_info("%x\n",buffer[x]);
+         //}
          //TO:DO check header and check size, if buffer doesn't have complete packet make next write to buffer and do not memset
          if(buffer[0] == 0xAA && buffer[1] == 0x55)
          {
@@ -163,7 +165,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              //Check if partial buffer
              if(uart_buffer_samples != packet_size)
              {
-                 printk("Buffer incomplete - found %d, expected %d", uart_buffer_samples, packet_size);
+                 //printk("Buffer incomplete - found %d, expected %d", uart_buffer_samples, packet_size);
                  //Buffer size is incomplete
                  memset(my_buffer, 0, 500);
                  //Save partial packet from uart buffer to my_buffer
@@ -178,7 +180,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              //Save uart buffer to my_buffer
              memcpy(my_buffer, buffer, size);
              //Release semaphore
-             printk("Buffer size correct - found %d, expected %d", uart_buffer_samples, packet_size);
+             //printk("Buffer size correct - found %d, expected %d", uart_buffer_samples, packet_size);
              buffer_ready = true;
              buffer_frag = false;
              up(&my_semaphore);

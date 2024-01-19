@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
                 ioctl(fd, SEND_REBOOT_COMMAND, 0);
                 break;
             case '6':
+                while(1){
                 read(fd, read_buf, sizeof(read_buf));
                 //for(int x = 0; x < sizeof(read_buf); x++)
                 //{
@@ -119,6 +120,7 @@ int main(int argc, char *argv[]) {
                     printf("NO VALID HEADER\n");
                 }
                 //printf("\n");
+}
                 break;
             case '0':
                 // Exit the loop and close the file descriptor
