@@ -32,6 +32,16 @@ static struct class *my_class;
 static struct cdev my_device;
 
 static struct semaphore my_semaphore;
+static struct serdev_device *uartdev;
+//Boolean that states if buffer is ready to be read
+bool buffer_ready = false;
+//Boolean states if buffer is fragmented
+bool buffer_frag = false;
+//Int that keeps current offset written to buffer, used to write fragments to end of buffer
+int  buffer_size = 0;
+//Buffer that contains values
+char *my_buffer;
+
 
 #define DRIVER_NAME "my_uart_driver"
 #define DRIVER_CLASS "UartClass"
@@ -50,9 +60,6 @@ static struct semaphore my_semaphore;
 
 #define REBOOT_IOC_MAGIC 'V'
 #define SEND_REBOOT_COMMAND _IOW(REBOOT_IOC_MAGIC, 1, unsigned long)
-
-static struct serdev_device *uartdev;
-char *my_buffer;
 
 long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -94,6 +101,12 @@ static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, lo
                 //Failed to acquire semaphore, retry
                 continue;
             }
+            if(!buffer_ready)
+            {
+                //buffer isn't ready, release semaphore and try again
+                up(&my_semaphore);
+                continue;
+            }
             //Semaphore acquired
             break;
         }
@@ -133,20 +146,59 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              //Failed to aquire semaphore, no values read from buffer
              return 0;
          }
-
+         printk("\nHeader values %x%x",buffer[0],buffer[1]);
          //Semaphore acquired
          printk("Size %ld\n", size);
          for(int x = 0; x < size; x++)
          {
-            pr_info("%x\n",buffer[x]);
+             pr_info("%x\n",buffer[x]);
          }
          //TO:DO check header and check size, if buffer doesn't have complete packet make next write to buffer and do not memset
-
-         //Clear my_buffer
+         if(buffer[0] == 0xAA && buffer[1] == 0x55)
+         {
+             //Account for 10 byte header and 16 bit words
+             int uart_buffer_samples = ((int)size-10)/2;
+             int packet_size = (int)buffer[3];
+             buffer_size = size;
+             //Check if partial buffer
+             if(uart_buffer_samples != packet_size)
+             {
+                 printk("Buffer incomplete - found %d, expected %d", uart_buffer_samples, packet_size);
+                 //Buffer size is incomplete
+                 memset(my_buffer, 0, 500);
+                 //Save partial packet from uart buffer to my_buffer
+                 memcpy(my_buffer, buffer, size);
+                 buffer_ready = false;
+                 buffer_frag = true;
+                 up(&my_semaphore);
+                 return size;
+             }
+             //Clear my_buffer
+             memset(my_buffer, 0, 500);
+             //Save uart buffer to my_buffer
+             memcpy(my_buffer, buffer, size);
+             //Release semaphore
+             printk("Buffer size correct - found %d, expected %d", uart_buffer_samples, packet_size);
+             buffer_ready = true;
+             buffer_frag = false;
+             up(&my_semaphore);
+             return size;
+         }
+         if(buffer_frag)
+         {
+             //copy fragment into buffer
+             memcpy(my_buffer + buffer_size, buffer, size);
+             buffer_ready = true;
+             buffer_frag = false;
+             buffer_size += size;
+             up(&my_semaphore);
+             return size;
+         }
+         //Header not valid and buffer is not fragmented
          memset(my_buffer, 0, 500);
-         //Save uart buffer to my_buffer
-         memcpy(my_buffer, buffer, size);
-         //Release semaphore
+         buffer_ready = false;
+         buffer_frag = false;
+         buffer_size = 0;
          up(&my_semaphore);
          return size;
 }
