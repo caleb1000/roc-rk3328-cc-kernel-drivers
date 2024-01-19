@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdbool.h>
 
 #define DEVICE "/dev/my_uart_driver"
 
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
                 ioctl(fd, SEND_REBOOT_COMMAND, 0);
                 break;
             case '6':
-                while(1){
+   while(1){
                 read(fd, read_buf, sizeof(read_buf));
                 //for(int x = 0; x < sizeof(read_buf); x++)
                 //{
@@ -92,6 +93,11 @@ int main(int argc, char *argv[]) {
                     raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                     lsa = (float)(raw_value>>1)/64;
                     printf("Stop angle - LSA: %f\n", lsa);
+                    //Check if angle crosses 360 angle boundry
+                    if(lsa < fsa)
+                    {
+                       lsa = lsa + 360;
+                    }
                     diff = lsa - fsa;
                     for(int x = 0; x < 2*packet_size; x+=2)
                     {
@@ -107,11 +113,21 @@ int main(int argc, char *argv[]) {
                        }
                        else if(i == packet_size)
                        {
+                           //Reset lsa value if it was altered for the angle math
+                           if(lsa > 360)
+                           {
+                               lsa = lsa - 360;
+                           }
                            printf("Angle: %.2f\n", lsa);
                        }
                        else{
-                       angle = (diff/(packet_size-1)) * (i-1) + fsa;
-                       printf("Angle: %.2f\n", angle);
+                            angle = (diff/(packet_size-1)) * (i-1) + fsa;
+                            //Convert angle measurement to be within one unit circle
+                            if(angle > 360)
+                            {
+                                 angle = angle - 360;
+                            }
+                            printf("Angle: %.2f\n", angle);
                        }
                     }
 
@@ -119,7 +135,6 @@ int main(int argc, char *argv[]) {
                 else{
                     printf("NO VALID HEADER\n");
                 }
-                //printf("\n");
 }
                 break;
             case '0':

@@ -65,27 +65,27 @@ long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
 	if (cmd == SEND_START_COMMAND) {
             serdev_device_write_buf(uartdev, start_scan_mode_command, 2);
-            pr_info("uart_driver - Start scan mode command");
+            pr_info("ydlidar_x4_driver - Start scan mode command");
             return 1;
 	}
 	else if (cmd == SEND_STOP_COMMAND) {
             serdev_device_write_buf(uartdev, stop_scan_mode_command, 2);
-            pr_info("uart_driver - Stop scan mode command");
+            pr_info("ydlidar_x4_driver - Stop scan mode command");
             return 1;
 	}
 	else if (cmd == SEND_INFO_COMMAND) {
             serdev_device_write_buf(uartdev, device_info_command, 2);
-            pr_info("uart_driver - Device info command");
+            pr_info("ydlidar_x4_driver - Device info command");
             return 1;
 	}
 	else if (cmd == SEND_STATUS_COMMAND) {
             serdev_device_write_buf(uartdev, health_status_command, 2);
-            pr_info("uart_driver - Health status command");
+            pr_info("ydlidar_x4_driver - Health status command");
             return 1;
 	}
 	else if (cmd == SEND_REBOOT_COMMAND) {
             serdev_device_write_buf(uartdev, reboot_command, 2);
-            pr_info("uart_driver - Reboot command");
+            pr_info("ydlidar_x4_driver - Reboot command");
             return 1;
 	}
         pr_err("uart_driver: No supported command issued");
@@ -94,11 +94,18 @@ long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 
 static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
         //return my_buffer to users space
-
+        int attempts = 10;
         while (1) {
             // Attempt to acquire the semaphore
+            if(attempts == 0)
+            {
+                up(&my_semaphore);
+	        pr_err("Error, invalid read!");
+                return -EINVAL;
+            }
             if (down_interruptible(&my_semaphore)) {
                 //Failed to acquire semaphore, retry
+                attempts--;
                 continue;
             }
             if(!buffer_ready)
@@ -214,12 +221,12 @@ static const struct serdev_device_ops uart_driver_ops = {
  */
 static int uart_driver_probe(struct serdev_device *serdev) {
 	int status;
-	pr_info("uart_driver - probe function!\n");
+	pr_info("ydlidar_x4_driver - probe function!\n");
 
 	serdev_device_set_client_ops(serdev, &uart_driver_ops);
 	status = serdev_device_open(serdev);
 	if(status) {
-		pr_err("uart_driver - Error opening serial port!\n");
+		pr_err("ydlidar_x4_driver - Error opening serial port!\n");
 		return -status;
 	}
 	serdev_device_set_baudrate(serdev, 128000);
@@ -234,7 +241,7 @@ static int uart_driver_probe(struct serdev_device *serdev) {
  * @brief This function is called on unloading the driver 
  */
 static void uart_driver_remove(struct serdev_device *serdev) {
-	pr_info("uart_driver - Now I am in the remove function\n");
+	pr_info("ydlidar_x4_driver - Now I am in the remove function\n");
 	serdev_device_close(serdev);
 }
 
@@ -249,28 +256,28 @@ static struct file_operations fops = {
  */
 static int __init my_init(void) {
 
-	pr_info("uart_driver - Loading the driver...\n");
+	pr_info("ydlidar_x4_driver - Loading the driver...\n");
 	if(serdev_device_driver_register(&uart_driver_driver)) {
-		printk("uart_driver - Error! Could not load driver\n");
+		printk("ydlidar_x4_driver - Error! Could not load driver\n");
 		return -1;
 	}
 
 	/* Allocate a device nr */
 	if( alloc_chrdev_region(&my_device_nr, 0, 1, DRIVER_NAME) < 0) {
-		pr_err("uart_driver - Device Nr. could not be allocated!\n");
+		pr_err("ydlidar_x4_driver - Device Nr. could not be allocated!\n");
 		return -1;
 	}
-	pr_info("uart_driver - read_write - Device Nr. Major: %d, Minor: %d was registered!\n", my_device_nr >> 20, my_device_nr && 0xfffff);
+	pr_info("ydlidar_x4_driver - read_write - Device Nr. Major: %d, Minor: %d was registered!\n", my_device_nr >> 20, my_device_nr && 0xfffff);
 
 	/* Create device class */
 	if((my_class = class_create(THIS_MODULE, DRIVER_CLASS)) == NULL) {
-		pr_err("uart_driver - Device class can not be created!\n");
+		pr_err("ydlidar_x4_driver - Device class can not be created!\n");
 		goto ClassError;
 	}
 
 	/* create device file */
 	if(device_create(my_class, NULL, my_device_nr, NULL, DRIVER_NAME) == NULL) {
-		pr_err("uart_driver - Can not create device file!\n");
+		pr_err("ydlidar_x4_driver - Can not create device file!\n");
 		goto FileError;
 	}
 
@@ -279,7 +286,7 @@ static int __init my_init(void) {
 
 	/* Regisering device to kernel */
 	if(cdev_add(&my_device, my_device_nr, 1) == -1) {
-		pr_err("uart_driver - Registering of device to kernel failed!\n");
+		pr_err("ydlidar_x4_driver - Registering of device to kernel failed!\n");
 		goto AddError;
 	}
 
@@ -304,13 +311,13 @@ ClassError:
  * @brief This function is called, when the module is removed from the kernel
  */
 static void __exit my_exit(void) {
-	pr_info("uart_driver - Unload driver");
+	pr_info("ydlidar_x4_driver - Unload driver");
 	serdev_device_driver_unregister(&uart_driver_driver);
         cdev_del(&my_device);
 	device_destroy(my_class, my_device_nr);
 	class_destroy(my_class);
 	unregister_chrdev_region(my_device_nr, 1);
-	pr_info("uart_driver - Removing Module\n");
+	pr_info("ydlidar_x4_driver - Removing Module\n");
 }
 
 module_init(my_init);
