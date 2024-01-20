@@ -319,7 +319,7 @@ static int __init my_init(void) {
         sema_init(&my_semaphore, 1);
 
         //to:do - use this buffer to fill with lidar data and write to user space
-        my_buffer = kmalloc(500, GFP_ATOMIC);
+        my_buffer = kmalloc(500, GFP_KERNEL);
 
 	return 0;
 
@@ -336,6 +336,12 @@ ClassError:
  * @brief This function is called, when the module is removed from the kernel
  */
 static void __exit my_exit(void) {
+        //Free buffer
+        kfree(my_buffer);
+        //Set to null to avoid double freeing
+        my_buffer = NULL;
+        //Put lidar back into idle mode (stop scan)
+        serdev_device_write_buf(uartdev, stop_scan_mode_command, 2);
 	pr_info("ydlidar_x4_driver - Unload driver");
 	serdev_device_driver_unregister(&uart_driver_driver);
         cdev_del(&my_device);
