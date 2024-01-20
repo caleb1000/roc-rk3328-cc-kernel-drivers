@@ -104,16 +104,17 @@ int main(int argc, char *argv[]) {
                     uint8_t low_byte, high_byte;
                     u_int16_t raw_value;
                     float diff, fsa, lsa, angle;
-                    low_byte = read_buf[6];
+                    low_byte = read_buf[4];
                     high_byte = read_buf[5];
                     raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                     fsa = (float)(raw_value>>1)/64;
                     printf("Start angle - FSA: %f\n", fsa);
-                    low_byte = read_buf[8];
+                    low_byte = read_buf[6];
                     high_byte = read_buf[7];
                     raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                     lsa = (float)(raw_value>>1)/64;
                     printf("Stop angle - LSA: %f\n", lsa);
+                    //TO:DO - use checksum to validate packet
                     //Check if angle crosses 360 angle boundry
                     if(lsa < fsa)
                     {
@@ -122,9 +123,10 @@ int main(int argc, char *argv[]) {
                     diff = lsa - fsa;
                     for(int x = 0; x < 2*packet_size; x+=2)
                     {
-                       low_byte = read_buf[x+11];
-                       high_byte = read_buf[x+10];
+                       low_byte = read_buf[x+10];
+                       high_byte = read_buf[x+11];
                        raw_value = (u_int16_t)((high_byte << 8) | low_byte);
+                       //raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                        float distance = (float)raw_value / 4;
                        printf("Scan %d: Distance: %.2fmm ", x/2, distance);
                        int i = (x/2) + 1;
