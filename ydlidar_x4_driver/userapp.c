@@ -11,6 +11,8 @@
 #include <math.h>
 #include <stdbool.h>
 
+#define PI 3.141592654
+
 #define DEVICE "/dev/my_uart_driver"
 
 #define START_IOC_MAGIC 'Z'
@@ -97,62 +99,118 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 if(read_buf[0] == 0xAA && read_buf[1] == 0x55){
-                    printf("Valid header found\n");
+                    printf("\nValid header found\n");
                     printf("Packet type: %x\n",read_buf[2]);
                     int packet_size = (int)read_buf[3];
                     printf("Packet size: %d\n",packet_size);
                     uint8_t low_byte, high_byte;
                     u_int16_t raw_value;
-                    float diff, fsa, lsa, angle;
+                    float distance, diff, fsa, lsa, fsa_correct, lsa_correct, fsa_distance, lsa_distance, angle, angle_correct;
                     low_byte = read_buf[4];
                     high_byte = read_buf[5];
                     raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                     fsa = (float)(raw_value>>1)/64;
-                    printf("Start angle - FSA: %f\n", fsa);
                     low_byte = read_buf[6];
                     high_byte = read_buf[7];
                     raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                     lsa = (float)(raw_value>>1)/64;
-                    printf("Stop angle - LSA: %f\n", lsa);
-                    //TO:DO - use checksum to validate packet
-                    //Check if angle crosses 360 angle boundry
+
+                    //If last angle is more than first add 360, this happens when the last angle passes 360 degrees
+                    //This is done to preserve the interpolation of values between fsa and lsa
                     if(lsa < fsa)
                     {
-                       lsa = lsa + 360;
+                        lsa += 360;
                     }
                     diff = lsa - fsa;
-                    for(int x = 0; x < 2*packet_size; x+=2)
+
+                    //TO:DO - use checksum to validate packet
+
+                    //Calculate FSA corrected angle value
+                    low_byte = read_buf[10];
+                    high_byte = read_buf[11];
+                    raw_value = (u_int16_t)((high_byte << 8) | low_byte);
+                    fsa_distance = (float)raw_value / 4;
+
+                    if(fsa_distance == 0)
                     {
+                        angle_correct = 0;
+                    }
+                    else
+                    {
+                        angle_correct = atan(21.8 * ((155.3 - fsa_distance)/(155.3*fsa_distance)));
+                        angle_correct = (angle_correct * 180) / PI;
+                    }
+                    fsa_correct = fsa + angle_correct;
+
+                    //Calculate LSA corrected angle value
+                    low_byte = read_buf[packet_size + 10];
+                    high_byte = read_buf[packet_size + 11];
+                    raw_value = (u_int16_t)((high_byte << 8) | low_byte);
+                    lsa_distance = (float)raw_value / 4;
+
+                    if(lsa_distance == 0)
+                    {
+                        angle_correct = 0;
+                    }
+                    else
+                    {
+                        angle_correct = atan(21.8 * ((155.3 - lsa_distance)/(155.3*lsa_distance)));
+                        angle_correct = (angle_correct * 180) / PI;
+                    }
+                    lsa_correct = lsa + angle_correct;
+
+                    //Normalize fsa to 0-360 degrees
+                    if(fsa_correct > 360)
+                    {
+                        fsa_correct -= 360;
+                    }
+                    else if(fsa_correct < 0)
+                    {
+                        fsa_correct += 360;
+                    }
+                    printf("Scan 1: Distance: %.2fmm Angle: %.2f\n", fsa_distance, fsa_correct);
+                    //TO:DO we must actually correct the lsa and fsa first before doing other math
+                    for(int x = 2; x < 2*packet_size - 2; x+=2)
+                    {
+                       int i = (x/2) + 1;
                        low_byte = read_buf[x+10];
                        high_byte = read_buf[x+11];
                        raw_value = (u_int16_t)((high_byte << 8) | low_byte);
-                       //raw_value = (u_int16_t)((high_byte << 8) | low_byte);
-                       float distance = (float)raw_value / 4;
-                       printf("Scan %d: Distance: %.2fmm ", x/2, distance);
-                       int i = (x/2) + 1;
-                       if(i == 1)
+                       distance = (float)raw_value / 4;
+                       printf("Scan %d: Distance: %.2fmm ", i, distance);
+
+                       if(distance == 0)
                        {
-                           printf("Angle: %.2f\n", fsa);
+                           angle_correct = 0;
                        }
-                       else if(i == packet_size)
+                       else
                        {
-                           //Reset lsa value if it was altered for the angle math
-                           if(lsa > 360)
-                           {
-                               lsa = lsa - 360;
-                           }
-                           printf("Angle: %.2f\n", lsa);
+                           angle_correct = atan(21.8 * ((155.3 - distance)/(155.3*distance)));
+                           angle_correct = (angle_correct * 180) / PI;
                        }
-                       else{
-                            angle = (diff/(packet_size-1)) * (i-1) + fsa;
-                            //Convert angle measurement to be within one unit circle
-                            if(angle > 360)
-                            {
-                                 angle = angle - 360;
-                            }
-                            printf("Angle: %.2f\n", angle);
+
+                       angle = ((diff/(packet_size-1)) * (i-1)) + fsa + angle_correct;
+                       //Normalize angle to 0-360 degrees
+                       if(angle > 360)
+                       {
+                           angle -= 360;
                        }
+                       else if(angle < 0)
+                       {
+                           angle += 360;
+                       }
+                       printf("Angle: %.2f\n", angle);
                     }
+                    //Normalize angle to 0-360 degrees
+                    if(lsa_correct > 360)
+                    {
+                        lsa_correct -= 360;
+                    }
+                    else if(lsa_correct < 0)
+                    {
+                        lsa_correct += 360;
+                    }
+                    printf("Scan %d: Distance: %.2fmm Angle: %.2f\n", packet_size, lsa_distance, lsa_correct);
 
                 }
                 else{
