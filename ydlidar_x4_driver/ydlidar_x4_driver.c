@@ -190,7 +190,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
          }
          //printk("\nHeader values %x%x",buffer[0],buffer[1]);
          //Semaphore acquired
-         printk("Uart Buffer Size %ld\n", size);
+         //printk("Uart Buffer Size %ld\n", size);
          //for(int x = 0; x < size; x++)
          //{
          //    pr_info("%x\n",buffer[x]);
