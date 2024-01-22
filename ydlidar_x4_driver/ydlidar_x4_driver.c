@@ -67,6 +67,12 @@ bool scan_mode = false;
 
 long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
+        if(!uartdev)
+        {
+            pr_err("ydlidar_x4_driver - uartdev is invalid");
+            return -EINVAL;
+        }
+
 	if (cmd == SEND_START_COMMAND) {
             scan_mode = true;
             serdev_device_write_buf(uartdev, start_scan_mode_command, 2);
@@ -112,6 +118,11 @@ long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
         //return my_buffer to users space
         int attempts = 10;
+        if(!my_buffer)
+        {
+	        pr_err("ydlidar_x4 - Buffer is invalid!");
+                return -EINVAL;
+        }
         if(!scan_mode)
         {
 	        pr_err("ydlidar_x4 - Error, not in scan mode!");
@@ -174,17 +185,21 @@ static struct serdev_device_driver uart_driver_driver = {
 static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *buffer, size_t size) {
 
          if (down_interruptible(&my_semaphore)) {
-             //Failed to aquire semaphore, no values read from buffer
+             //Failed to aquire semaphore
              return 0;
          }
          //printk("\nHeader values %x%x",buffer[0],buffer[1]);
          //Semaphore acquired
-         //printk("Uart Buffer Size %ld\n", size);
+         printk("Uart Buffer Size %ld\n", size);
          //for(int x = 0; x < size; x++)
          //{
          //    pr_info("%x\n",buffer[x]);
          //}
          //TO:DO check header and check size, if buffer doesn't have complete packet make next write to buffer and do not memset
+         if(size < 3 || size > 500)
+         {
+             goto InvalidBuf;
+         }
          if(buffer[0] == 0xAA && buffer[1] == 0x55)
          {
              //Account for 10 byte header and 16 bit words
@@ -218,6 +233,10 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
          if(buffer_frag)
          {
              //copy fragment into buffer
+             if(buffer_size + size >= 500)
+             {
+                  goto InvalidBuf;
+             }
              memcpy(my_buffer + buffer_size, buffer, size);
              buffer_ready = true;
              buffer_frag = false;
@@ -225,6 +244,8 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              up(&my_semaphore);
              return size;
          }
+
+InvalidBuf:
          //Header not valid and buffer is not fragmented
          memset(my_buffer, 0, 500);
          buffer_ready = false;
@@ -340,8 +361,6 @@ static void __exit my_exit(void) {
         kfree(my_buffer);
         //Set to null to avoid double freeing
         my_buffer = NULL;
-        //Put lidar back into idle mode (stop scan)
-        serdev_device_write_buf(uartdev, stop_scan_mode_command, 2);
 	pr_info("ydlidar_x4_driver - Unload driver");
 	serdev_device_driver_unregister(&uart_driver_driver);
         cdev_del(&my_device);
