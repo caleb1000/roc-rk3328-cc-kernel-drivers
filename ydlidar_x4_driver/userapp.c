@@ -140,6 +140,7 @@ int main(int argc, char *argv[]) {
                         angle_correct = atan(21.8 * ((155.3 - fsa_distance)/(155.3*fsa_distance)));
                         angle_correct = (angle_correct * 180) / PI;
                     }
+                    //printf("FSA correct %.2f\n", angle_correct);
                     fsa_correct = fsa + angle_correct;
 
                     //Calculate LSA corrected angle value
@@ -157,6 +158,7 @@ int main(int argc, char *argv[]) {
                         angle_correct = atan(21.8 * ((155.3 - lsa_distance)/(155.3*lsa_distance)));
                         angle_correct = (angle_correct * 180) / PI;
                     }
+                    //printf("LSA correct %.2f\n", angle_correct);
                     lsa_correct = lsa + angle_correct;
 
                     //Normalize fsa to 0-360 degrees

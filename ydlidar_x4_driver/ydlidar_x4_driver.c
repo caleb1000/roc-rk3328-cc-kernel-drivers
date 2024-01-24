@@ -67,6 +67,10 @@ bool scan_mode = false;
 
 long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
+        if (!file->f_path.dentry->d_inode) {
+            // Handle the case where the user space program has closed
+            return -EINVAL;
+        }
         if(!uartdev)
         {
             pr_err("ydlidar_x4_driver - uartdev is invalid");
@@ -118,22 +122,11 @@ long driver_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
         //return my_buffer to users space
         int attempts = 10;
-        if(!my_buffer)
-        {
-	        pr_err("ydlidar_x4 - Buffer is invalid!");
-                return -EINVAL;
-        }
-        if(!scan_mode)
-        {
-	        pr_err("ydlidar_x4 - Error, not in scan mode!");
-                return -EINVAL;
-        }
         while (1) {
             // Attempt to acquire the semaphore
             if(attempts == 0)
             {
-                up(&my_semaphore);
-	        pr_err("ydlidar_x4 - Error, invalid read!");
+	        pr_err("ydlidar_x4 - Error, unable to aquire semaphore!");
                 return -EINVAL;
             }
             if (down_interruptible(&my_semaphore)) {
@@ -141,6 +134,31 @@ static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, lo
                 attempts--;
                 continue;
             }
+            if (!filp->f_path.dentry->d_inode) {
+	        pr_err("ydlidar_x4 - User space program has been closed!");
+                // Handle the case where the user space program has closed
+                up(&my_semaphore);
+                return -EINVAL;
+            }
+            if(!my_buffer)
+            {
+	        pr_err("ydlidar_x4 - Kernel Space Buffer is invalid!");
+                up(&my_semaphore);
+                return -EINVAL;
+            }
+            if(!buf)
+            {
+	        pr_err("ydlidar_x4 - User Space Buffer is invalid!");
+                up(&my_semaphore);
+                return -EINVAL;
+            }
+            if(!scan_mode)
+            {
+	        pr_err("ydlidar_x4 - Error, not in scan mode!");
+                up(&my_semaphore);
+                return -EINVAL;
+            }
+
             if(!buffer_ready)
             {
                 //buffer isn't ready, release semaphore and try again
@@ -152,8 +170,8 @@ static ssize_t driver_read(struct file *filp, char __user *buf, size_t count, lo
         }
         if(copy_to_user(buf, my_buffer, 500))
         {
+	    pr_err("ydlidar_x4 - Error, Failed to copy to user buffer!");
             up(&my_semaphore);
-	    pr_err("ydlidar_x4 - Error, invalid read!");
             return -EINVAL;
         }
         //Buffer data has been read, set flag so that this old data is not read again
@@ -184,7 +202,21 @@ static struct serdev_device_driver uart_driver_driver = {
  */
 static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *buffer, size_t size) {
 
+         if(!serdev)
+         {
+            pr_err("ydlidar_x4 - Error, invalid serdev!");
+            return -EINVAL;
+         }
+         if(!buffer)
+         {
+            pr_err("ydlidar_x4 - Error, invalid buffer!");
+            return -EINVAL;
+         }
          if (down_interruptible(&my_semaphore)) {
+             if(size > 500)
+             {
+                 return size;
+             }
              //Failed to aquire semaphore
              return 0;
          }
@@ -227,6 +259,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
              //printk("Buffer size correct - found %d, expected %d", uart_buffer_samples, packet_size);
              buffer_ready = true;
              buffer_frag = false;
+             buffer_size = size;
              up(&my_semaphore);
              return size;
          }
