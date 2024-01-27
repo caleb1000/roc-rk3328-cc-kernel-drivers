@@ -11,6 +11,12 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include <arpa/inet.h>
+
+#define SERVER_IP "192.168.1.6"
+#define SERVER_PORT 6969
+#define ARRAY_SIZE 80
+
 #define PI 3.141592654
 
 #define DEVICE "/dev/my_uart_driver"
@@ -35,6 +41,29 @@
 
 
 int main(int argc, char *argv[]) {
+
+
+
+
+
+   int sockfd;
+   struct sockaddr_in servaddr;
+   float send_buffer[ARRAY_SIZE];
+   // Create UDP socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    memset(&servaddr, 0, sizeof(servaddr));
+    // Filling server information
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(SERVER_PORT);
+    servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+    int len = sizeof(servaddr);
+
+
+
 	int fd, packet_count;
         char command, read_buf[500];
 	fd = open(DEVICE, O_RDWR);
@@ -91,18 +120,18 @@ int main(int argc, char *argv[]) {
                 printf("Invalid input. Please enter a positive integer.\n");
                     break;
                 }
-
    for(int i = 0; i < packet_count; i++){
+
                 if(read(fd, read_buf, sizeof(read_buf)) != 0)
                 {
                     printf("Read failed (HINT: scan mode must be set first)!\n");
                     continue;
                 }
                 if(read_buf[0] == 0xAA && read_buf[1] == 0x55){
-                    printf("\nValid header found\n");
-                    printf("Packet type: %x\n",read_buf[2]);
+                    //printf("\nValid header found\n");
+                    //printf("Packet type: %x\n",read_buf[2]);
                     int packet_size = (int)read_buf[3];
-                    printf("Packet size: %d\n",packet_size);
+                    //printf("Packet size: %d\n",packet_size);
                     uint8_t low_byte, high_byte;
                     u_int16_t raw_value;
                     float distance, diff, fsa, lsa, fsa_correct, lsa_correct, fsa_distance, lsa_distance, angle, angle_correct;
@@ -170,7 +199,11 @@ int main(int argc, char *argv[]) {
                     {
                         fsa_correct += 360;
                     }
-                    printf("Scan 1: Distance: %.2fmm Angle: %.2f\n", fsa_distance, fsa_correct);
+                    //Reset buffer
+                    memset(send_buffer, 0, ARRAY_SIZE * sizeof(float));
+                    send_buffer[0] = fsa_distance;
+                    send_buffer[1] = fsa_correct;
+                    //printf("Scan 1: Distance: %.2fmm Angle: %.2f\n", fsa_distance, fsa_correct);
                     //TO:DO we must actually correct the lsa and fsa first before doing other math
                     for(int x = 2; x < 2*packet_size - 2; x+=2)
                     {
@@ -179,8 +212,8 @@ int main(int argc, char *argv[]) {
                        high_byte = read_buf[x+11];
                        raw_value = (u_int16_t)((high_byte << 8) | low_byte);
                        distance = (float)raw_value / 4;
-                       printf("Scan %d: Distance: %.2fmm ", i, distance);
-
+                       //printf("Scan %d: Distance: %.2fmm ", i, distance);
+                       send_buffer[x] = distance;
                        if(distance == 0)
                        {
                            angle_correct = 0;
@@ -201,7 +234,8 @@ int main(int argc, char *argv[]) {
                        {
                            angle += 360;
                        }
-                       printf("Angle: %.2f\n", angle);
+                       send_buffer[x+1] = angle;
+                      // printf("Angle: %.2f\n", angle);
                     }
                     //Normalize angle to 0-360 degrees
                     if(lsa_correct > 360)
@@ -212,13 +246,18 @@ int main(int argc, char *argv[]) {
                     {
                         lsa_correct += 360;
                     }
-                    printf("Scan %d: Distance: %.2fmm Angle: %.2f\n", packet_size, lsa_distance, lsa_correct);
+                    send_buffer[78] = lsa_distance;
+                    send_buffer[79] = lsa_correct;
+                    sendto(sockfd, send_buffer, sizeof(send_buffer), 0, (const struct sockaddr *)&servaddr, len);
+                    //printf("Data sent.\n");
+                    //printf("Scan %d: Distance: %.2fmm Angle: %.2f\n", packet_size, lsa_distance, lsa_correct);
 
                 }
                 else{
                     printf("NO VALID HEADER\n");
                 }
 }
+
                 break;
             case '0':
                 // Exit the loop and close the file descriptor
@@ -228,6 +267,7 @@ int main(int argc, char *argv[]) {
                 printf("Invalid command. Please enter a valid command (0-6).\n");
         }
     }
+  close(sockfd);
     close(fd);
     return 0;
 }

@@ -215,6 +215,7 @@ static int uart_driver_recv(struct serdev_device *serdev, const unsigned char *b
          if (down_interruptible(&my_semaphore)) {
              if(size > 500)
              {
+                 pr_warn("ydlidar_x4 - Warning, UART buffer cleared!");
                  return size;
              }
              //Failed to aquire semaphore
