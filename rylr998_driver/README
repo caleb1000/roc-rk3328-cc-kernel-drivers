@@ -1,0 +1,24 @@
+# RYLR998 LoRa Linux Driver
+
+This driver provides kernel support for the RYLR998 LoRa module via UART using the `serdev` subsystem.
+
+## Installation
+
+1. Build the driver:
+
+    make
+
+2. Apply the Device Tree overlay (requires root):
+
+    sudo apply_rylr998_overlay.sh
+
+> The overlay must be applied so the kernel can detect the RYLR998 device and automatically load the driver.
+
+## Notes
+
+- Make sure the script is executable:
+
+    chmod +x apply_rylr998_overlay.sh
+
+- For automatic application at boot, you can create a systemd service to run this script.
+
